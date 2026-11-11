@@ -1,0 +1,56 @@
+# PostgreSQL + Redis on the host (127.0.0.1).
+# network_mode: host — containers use the host network (same as 127.0.0.1:5432).
+#
+# Migrate (no links / no-deps issues):
+#   docker-compose -f docker-compose.hostdb.yml run --rm migrate
+#
+# Start API + Celery:
+#   docker-compose -f docker-compose.hostdb.yml up -d api celery
+#
+# .env:
+#   DATABASE_URL=postgresql+asyncpg://USER:PASS@127.0.0.1:5432/DBNAME
+#   REDIS_URL=redis://127.0.0.1:6379/0
+
+services:
+  migrate:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    network_mode: host
+    entrypoint: ["alembic", "upgrade", "head"]
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: firoozeh-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: "lax"
+    network_mode: host
+    restart: unless-stopped
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8010
+
+  celery:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: carpet-celery
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      COOKIE_SECURE: "false"
+    network_mode: host
+    restart: unless-stopped
+    command: celery -A src.core.celery_app.celery_app worker --loglevel=info

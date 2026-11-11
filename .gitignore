@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.Python
+
+
+
+# Build
+.next/
+out/
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Uploads
+uploads/
+
+# Alembic
+# keep versions tracked
+
+# Secrets — real env files stay on each machine (the *.example files are tracked)
+.env
+.env.local
+apps/api/.env
+apps/web/.env.local
+
+# Deployment bundles / generated artifacts
+*.zip
+*.tar.gz
+*.tsbuildinfo
+
+# Personal data
+phones.txt
+
+# Local notes (not published)
+README.md
+commmands for running.txt
+runcmds_extract.txt

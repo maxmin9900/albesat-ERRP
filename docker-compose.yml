@@ -1,0 +1,74 @@
+# Default compose: API + Celery + Web (no Postgres/Redis containers).
+#
+# Server (Postgres + Redis already on host):
+#   docker-compose -f docker-compose.hostdb.yml run --rm migrate
+#   docker-compose -f docker-compose.hostdb.yml up -d api celery
+#
+# Local dev — full stack in Docker (copy .env.docker.example → .env first):
+#   .\scripts\docker-local-up.ps1
+#   — or —
+#   docker compose -f docker-compose.yml -f docker-compose.dockerdb.yml run --rm migrate
+#   docker compose -f docker-compose.yml -f docker-compose.dockerdb.yml up -d --build
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11-slim}
+    container_name: firoozeh-api
+    env_file:
+      - .env
+    ports:
+      - "8010:8000"
+    volumes:
+      - ./apps/api:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11-slim}
+    container_name: carpet-celery
+    env_file:
+      - .env
+    volumes:
+      - ./apps/api:/app
+    command: celery -A src.core.celery_app.celery_app worker --loglevel=info
+
+  # Frontend is opt-in (apps/web is not part of this repo yet).
+  # Enable explicitly: docker compose --profile frontend ... up -d
+  web:
+    profiles: ["frontend"]
+    platform: linux/amd64
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+      args:
+        # WEB_NODE_IMAGE avoids stale shell NODE_IMAGE=...-alpine breaking builds on Windows.
+        NODE_IMAGE: ${WEB_NODE_IMAGE:-node:20-bookworm-slim}
+    container_name: carpet-web
+    environment:
+      NEXT_PUBLIC_API_URL: /api/v1
+      API_INTERNAL_URL: http://api:8000
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3050:3050"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3050').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 45s
+    depends_on:
+      api:
+        condition: service_healthy
